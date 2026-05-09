@@ -15,13 +15,13 @@ models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="College Discovery API")
 
-# --- 🌐 CORS CONFIGURATION ---
+# --- 🌐 CORS CONFIGURATION (Aggressive Fix) ---
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"],  # Allows all origins
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["*"],  # Allows all methods (GET, POST, etc.)
+    allow_headers=["*"],  # Allows all headers
 )
 
 @app.get("/")
@@ -70,24 +70,20 @@ def compare_colleges(
 
 @app.post("/signup")
 def signup(user: schemas.UserCreate, db: Session = Depends(get_db)):
-    # 1. Check if user already exists
     db_user = db.query(models.User).filter(models.User.email == user.email).first() 
     if db_user:
         raise HTTPException(status_code=400, detail="Email already registered")
     
-    # 2. HASHING CHECK: 
-    # Use whatever function name you have in auth_utils.py (usually hash_password or get_password_hash)
     try:
         hashed_password = auth_utils.hash_password(user.password)
     except AttributeError:
         hashed_password = auth_utils.get_password_hash(user.password)
     
-    # 3. Create the new user object
     new_user = models.User(
         email=user.email, 
         hashed_password=hashed_password, 
         full_name=user.full_name,
-        is_active=True # Setting default explicitly just in case
+        is_active=True 
     )
     
     try:
@@ -98,22 +94,18 @@ def signup(user: schemas.UserCreate, db: Session = Depends(get_db)):
     except Exception as e:
         db.rollback()
         print(f"Database Error: {e}")
-        raise HTTPException(status_code=500, detail="Database save failed. Check Postgres columns.")
+        raise HTTPException(status_code=500, detail="Database save failed.")
     
 
 @app.post("/login")
 def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
-    # 1. Find user by email (OAuth2Form uses 'username' field for email)
     user = db.query(models.User).filter(models.User.email == form_data.username).first()
     
-    # 2. Verify password
     if not user or not verify_password(form_data.password, user.hashed_password):
         raise HTTPException(status_code=401, detail="Invalid credentials")
     
-    # 3. Create Token
     access_token = create_access_token(data={"sub": user.email})
     
-    # 4. 🔥 FIXED: Return user_name so the Frontend Navbar can display it!
     return {
         "access_token": access_token, 
         "token_type": "bearer",

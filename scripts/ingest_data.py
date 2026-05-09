@@ -1,28 +1,38 @@
 import json
 import random
-from sqlalchemy.orm import Session
-from app.database import SessionLocal, engine
-from app.models import College
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from app.models import College, Base
+
+# YOUR NEON CLOUD URL
+DATABASE_URL = "postgresql://neondb_owner:npg_u8IhVm0TafZO@ep-floral-river-aqmkgwyj-pooler.c-8.us-east-1.aws.neon.tech/neondb?sslmode=require"
+
+engine = create_engine(DATABASE_URL)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 def seed_data():
+    Base.metadata.create_all(bind=engine)
     db = SessionLocal()
-    with open('colleges_data.json', 'r') as f:
-        raw_data = json.load(f)
+    try:
+        with open('colleges_data.json', 'r') as f:
+            raw_data = json.load(f)
 
-    for item in raw_data:
-        # Map NIRF names to our DB columns
-        new_college = College(
-            name=item.get("Name"),
-            location=f"{item.get('City')}, {item.get('State')}",
-            # Generating realistic mock data for missing fields
-            fees=random.randint(50000, 400000), 
-            placement_rate=round(random.uniform(70, 98), 2),
-            rating=round(random.uniform(3.5, 5.0), 1)
-        )
-        db.add(new_college)
-    
-    db.commit()
-    print("🚀 Real data with realistic metrics injected successfully!")
+        for item in raw_data:
+            # We are only using 'name', 'location', and 'fees' to match your DB columns
+            new_college = College(
+                name=item.get("Name"),
+                location=f"{item.get('City')}, {item.get('State')}",
+                fees=random.randint(50000, 400000)
+            )
+            db.add(new_college)
+        
+        db.commit()
+        print("🚀 Data injected into NEON CLOUD successfully!")
+    except Exception as e:
+        print(f"❌ Error: {e}")
+        db.rollback()
+    finally:
+        db.close()
 
 if __name__ == "__main__":
     seed_data()
